@@ -32,7 +32,7 @@ public readonly struct Entity : IEquatable<Entity>, IComparable<Entity>, IDispos
     /// <summary>
     /// The World in which the Entity exists.
     /// </summary>
-    internal readonly World World;
+    public readonly World World;
 
 
     /// <summary>
