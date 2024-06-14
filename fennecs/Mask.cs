@@ -1,64 +1,38 @@
 // SPDX-License-Identifier: MIT
 
+using System.Collections.Immutable;
 using fennecs.pools;
 
 namespace fennecs;
 
-public sealed class Mask : IDisposable
+internal sealed class Mask : IDisposable
 {
-    internal readonly List<TypeExpression> HasTypes = new(8);
-    internal readonly List<TypeExpression> NotTypes = new(8);
-    internal readonly List<TypeExpression> AnyTypes = new(8);
+    internal readonly SortedSet<TypeExpression> HasTypes = [];
+    internal readonly SortedSet<TypeExpression> NotTypes = [];
+    internal readonly SortedSet<TypeExpression> AnyTypes = [];
 
-    public bool SafeForAddition(TypeExpression typeExpression) => NotTypes.Contains(typeExpression);
+    public bool SafeForAddition(TypeExpression typeExpression) => typeExpression.Matches(NotTypes);
     public bool SafeForRemoval(TypeExpression typeExpression) => typeExpression.Matches(HasTypes) || typeExpression.Matches(AnyTypes);
 
 
-    public void Has(TypeExpression typeExpression)
+    public Mask Has(TypeExpression typeExpression)
     {
-        if (typeExpression.Matches(HasTypes) || typeExpression.Matches(AnyTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already (partially or fully) covered by this Query/Mask.");
-        }
-
-        if (typeExpression.Matches(NotTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already filtered out by this Query/Mask.");
-        }
-
         HasTypes.Add(typeExpression);
+        return this;
     }
 
 
-    public void Not(TypeExpression typeExpression)
+    public Mask Not(TypeExpression typeExpression)
     {
-        if (typeExpression.Matches(HasTypes) || typeExpression.Matches(AnyTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already (partially or fully) covered by this Query/Mask.");
-        }
-
-        if (typeExpression.Matches(NotTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already filtered out by this Query/Mask.");
-        }
-
         NotTypes.Add(typeExpression);
+        return this;
     }
 
 
-    public void Any(TypeExpression typeExpression)
+    public Mask Any(TypeExpression typeExpression)
     {
-        if (typeExpression.Matches(HasTypes) || typeExpression.Matches(AnyTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already (partially or fully) covered by this Query/Mask.");
-        }
-
-        if (typeExpression.Matches(NotTypes))
-        {
-            throw new InvalidOperationException($"Type {typeExpression} is already filtered out by this Query/Mask.");
-        }
-
         AnyTypes.Add(typeExpression);
+        return this;
     }
 
 
@@ -73,41 +47,34 @@ public sealed class Mask : IDisposable
     private int Key()
     {
         var hash = HashCode.Combine(HasTypes.Count);
-
-        foreach (var type in HasTypes)
-        {
-            hash = HashCode.Combine(hash, type);
-        }
-
-        HashCode.Combine(NotTypes.Count);
-
-        foreach (var type in NotTypes)
-        {
-            hash = HashCode.Combine(hash, type);
-        }
-
-        HashCode.Combine(AnyTypes.Count);
-
-        foreach (var type in AnyTypes)
-        {
-            hash = HashCode.Combine(hash, type);
-        }
-
+        hash = HasTypes.Aggregate(hash, HashCode.Combine);
+        hash = HashCode.Combine(hash, NotTypes.Count);
+        hash = NotTypes.Aggregate(hash, HashCode.Combine);
+        hash = HashCode.Combine(hash, AnyTypes.Count);
+        hash = AnyTypes.Aggregate(hash, HashCode.Combine);
+        
         return hash;
     }
 
+    /// <inheritdoc />
+    public override int GetHashCode() => Key();
 
-    public static implicit operator int(Mask self) => self.Key();
-
+    /// <inheritdoc />
     public void Dispose() => MaskPool.Return(this);
 
 
+    /// <summary>
+    /// Clones the mask and returns a new instance.
+    /// </summary>
+    /// <remarks>
+    /// The new instance should be Disposed after use to re-cycle its resources to the internal pool.
+    /// </remarks> 
     public Mask Clone()
     {
         var mask = MaskPool.Rent();
-        mask.HasTypes.AddRange(HasTypes);
-        mask.NotTypes.AddRange(NotTypes);
-        mask.AnyTypes.AddRange(AnyTypes);
+        mask.HasTypes.UnionWith(HasTypes);
+        mask.NotTypes.UnionWith(NotTypes);
+        mask.AnyTypes.UnionWith(AnyTypes);
         return mask;
     }
 }

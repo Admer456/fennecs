@@ -1,21 +1,22 @@
 ﻿global using TypeID = short;
+using System.Collections.Concurrent;
 
 namespace fennecs;
 
 internal class LanguageType
 {
-    protected internal static Type Resolve(TypeID typeId) => Types[typeId];
+    internal protected static Type Resolve(TypeID typeId) => Types[typeId];
 
     // Shared ID counter
     protected static TypeID Counter;
 
-    protected static readonly Dictionary<TypeID, Type> Types = new();
-    protected static readonly Dictionary<Type, TypeID> Ids = new();
+    protected static readonly ConcurrentDictionary<TypeID, Type> Types = new();
+    protected static readonly ConcurrentDictionary<Type, TypeID> Ids = new();
 
     protected static readonly object RegistryLock = new();
 
 
-    protected internal static TypeID Identify(Type type)
+    internal protected static TypeID Identify(Type type)
     {
         lock (RegistryLock)
         {
@@ -68,8 +69,8 @@ internal class LanguageType<T> : LanguageType
         lock (RegistryLock)
         {
             Id = ++Counter;
-            Types.Add(Id, typeof(T));
-            Ids.Add(typeof(T), Id);
+            Types.TryAdd(Id, typeof(T));
+            Ids.TryAdd(typeof(T), Id);
         }
     }
 

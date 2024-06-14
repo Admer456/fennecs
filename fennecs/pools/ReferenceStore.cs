@@ -1,9 +1,14 @@
-﻿namespace fennecs.pools;
+﻿using System.Diagnostics;
 
-public class ReferenceStore(int capacity = 4096)
+namespace fennecs.pools;
+
+/// <summary>
+/// Storage for the targets of ObjectLinks
+/// </summary>
+/// <param name="capacity">initial capacity (count) of references dictionary</param>
+internal class ReferenceStore(int capacity = 4096)
 {
     private readonly Dictionary<Identity, StoredReference<object>> _storage = new(capacity);
-
 
     public Identity Request<T>(T item) where T : class
     {
@@ -16,8 +21,11 @@ public class ReferenceStore(int capacity = 4096)
             // Already tracking this item.
             if (_storage.TryGetValue(identity, out var reference))
             {
+                //TODO: Consider replacing exception with assert.
+                //Debug.Assert(reference.Item != item, $"GetHashCode() collision in {typeof(T)}, causing Identity collision between {item} and {reference.Item} in {reference}.");
                 if (reference.Item != item)
                 {
+                    //TODO: Maybe disable the exception handling here, gives better inlining performance.
                     throw new InvalidOperationException($"GetHashCode() collision in {typeof(T)}, causing Identity collision between {item} and {reference.Item} in {reference}.");
                 }
 

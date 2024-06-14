@@ -1,28 +1,29 @@
 // SPDX-License-Identifier: MIT
 
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using fennecs.pools;
 
 namespace fennecs;
 
-public partial class World
+public partial class World : Query
 {
-    #region State & Storage
+    #region World State & Storage
     private readonly IdentityPool _identityPool;
 
     private Meta[] _meta;
-    private readonly List<Archetype> _archetypes = [];
 
     // "Identity" Archetype; all living Entities. (TODO: maybe change into publicly accessible "all" Query)
     private readonly Archetype _root;
 
-    private readonly Dictionary<int, Query> _queries = new();
+    private readonly HashSet<Query> _queries = [];
+    private readonly Dictionary<int, Query> _queryCache = new();
 
     // The new Type Graph that replaces the old Table Edge system.
-    private readonly Dictionary<Signature<TypeExpression>, Archetype> _typeGraph = new();
+    private readonly Dictionary<Signature, Archetype> _typeGraph = new();
 
     private readonly Dictionary<TypeExpression, List<Archetype>> _tablesByType = new();
-    private readonly Dictionary<Identity, HashSet<TypeExpression>> _typesByRelationTarget = new();
+    private readonly Dictionary<Relate, HashSet<TypeExpression>> _typesByRelationTarget = new();
     #endregion
 
 
@@ -64,15 +65,13 @@ public partial class World
         {
             var identity = _identityPool.Spawn();
 
-            var row = _root.Add(identity);
+            // FIXME: Cleanup / Unify! (not pretty to directly interact with the internals here)
+            Array.Resize(ref _meta, (int) BitOperations.RoundUpToPowerOf2((uint)(_identityPool.Created + 1)));
 
-            while (_meta.Length <= _identityPool.Created) Array.Resize(ref _meta, _meta.Length * 2);
-
-            _meta[identity.Index] = new Meta(identity, _root, row);
-
-            var entityStorage = (Identity[]) _root.Storages.First();
-            entityStorage[row] = identity;
-
+            _meta[identity.Index] = new(_root, _root.Count, identity);
+            _root.IdentityStorage.Append(identity);
+            _root.Invalidate();   
+            
             return identity;
         }
     }
@@ -81,100 +80,115 @@ public partial class World
     private bool HasComponent(Identity identity, TypeExpression typeExpression)
     {
         var meta = _meta[identity.Index];
-        return meta.Identity != Match.Plain
+        return meta.Identity != default
                && meta.Identity == identity
-               && typeExpression.Matches(meta.Archetype.Signature);
+               && typeExpression.Matches(meta.Archetype.MatchSignature);
     }
 
 
-    private void DespawnImpl(Identity identity)
+    private void DespawnImpl(Entity entity)
     {
-        lock (_spawnLock)
-        {
-            AssertAlive(identity);
+            AssertAlive(entity);
 
             if (Mode == WorldMode.Deferred)
             {
-                _deferredOperations.Enqueue(new DeferredOperation {Opcode = Opcode.Despawn, Identity = identity});
+                _deferredOperations.Enqueue(new DeferredOperation {Opcode = Opcode.Despawn, Identity = entity});
                 return;
             }
 
-            ref var meta = ref _meta[identity.Index];
+            DespawnDependencies(entity);
+
+            ref var meta = ref _meta[entity.Id.Index];
 
             var table = meta.Archetype;
-            table.Remove(meta.Row);
-            meta.Clear();
+            table.Delete(meta.Row);
 
-            _identityPool.Recycle(identity);
+            _identityPool.Recycle(entity);
 
-            // Find identity-identity relation reverse lookup (if applicable)
-            if (!_typesByRelationTarget.TryGetValue(identity, out var list)) return;
+            // Patch Meta
+            _meta[entity.Id.Index] = default;
+    }
 
-            //Remove Components from all Entities that had a relation
-            foreach (var type in list)
+
+    private void DespawnDependencies(Entity entity)
+    {
+        // Find identity-identity relation reverse lookup (if applicable)
+        if (!_typesByRelationTarget.TryGetValue(Relate.To(entity), out var types) 
+            || types.Count == 0) return;
+
+        // Collect Archetypes that have any of these relations
+        var toMigrate = Archetypes.Where(a => a.Signature.Matches(types)).ToList();
+
+        // And migrate them to a new Archetype without the relation
+        foreach (var archetype in toMigrate)
+        {
+            if (archetype.Count > 0)
             {
-                var tablesWithType = _tablesByType[type];
-
-                //TODO: There should be a bulk remove method instead.
-                foreach (var tableWithType in tablesWithType)
-                    for (var i = tableWithType.Count - 1; i >= 0; i--)
-                        RemoveComponent(tableWithType.Identities[i], type);
+                var signatureWithoutTarget = archetype.Signature.Except(types);
+                var destination = GetArchetype(signatureWithoutTarget);
+                archetype.Migrate(destination);
             }
+            DisposeArchetype(archetype);
         }
+        
+        // No longer tracking this Entity
+        _typesByRelationTarget.Remove(Relate.To(entity));
     }
     #endregion
 
 
     #region Queries
-    internal Query GetQuery(List<TypeExpression> streamTypes, Mask mask, Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> createQuery)
-    {
-        if (_queries.TryGetValue(mask, out var query))
-        {
-            MaskPool.Return(mask);
-            return query;
-        }
 
-        var type = mask.HasTypes[index: 0];
-        if (!_tablesByType.TryGetValue(type, out var typeTables))
-        {
-            typeTables = new List<Archetype>(capacity: 16);
-            _tablesByType[type] = typeTables;
-        }
+    internal Query CompileQuery(Mask mask)
+    {
+        // Return cached query if available.
+        if (_queryCache.TryGetValue(mask.GetHashCode(), out var query)) return query;
 
         var matchingTables = PooledList<Archetype>.Rent();
-        foreach (var table in _archetypes)
-            if (table.Matches(mask))
-                matchingTables.Add(table);
+        matchingTables.AddRange(Archetypes.Where(table => table.Matches(mask)));
 
-        query = createQuery(this, streamTypes, mask, matchingTables);
-
-        _queries.Add(mask, query);
+        query = new(this, mask.Clone(), matchingTables);
+        _queries.Add(query);
+        _queryCache.TryAdd(query.Mask.GetHashCode(), query);
         return query;
     }
 
 
     internal void RemoveQuery(Query query)
     {
-        _queries.Remove(query.Mask);
+        _queries.Remove(query);
+        _queryCache.Remove(query.Mask.GetHashCode());
     }
 
 
     internal ref Meta GetEntityMeta(Identity identity) => ref _meta[identity.Index];
 
 
-    private Archetype GetArchetype(Signature<TypeExpression> types)
+    private Archetype GetArchetype(Signature types)
     {
         if (_typeGraph.TryGetValue(types, out var table)) return table;
 
-        table = new Archetype(this, types);
-        _archetypes.Add(table);
-        _typeGraph.Add(types, table);
+        table = new(this, types);
 
+        //This could be given to us by the next query update?
+        Archetypes.Add(table);
+
+        // TODO: This is a suboptimal lookup (enumerate dictionary)
+        // IDEA: Maybe we can keep Queries in a Tree which
+        // identifies them just by their Signature root. (?) 
+        foreach (var query in _queries)
+        {
+            if (table.Matches(query.Mask))
+            {
+                query.TrackArchetype(table);
+            }
+        }
+        
         foreach (var type in types)
         {
             if (!_tablesByType.TryGetValue(type, out var tableList))
             {
-                tableList = [];
+                tableList = new(capacity: 16);
                 _tablesByType[type] = tableList;
             }
 
@@ -182,35 +196,40 @@ public partial class World
 
             if (!type.isRelation) continue;
 
-            if (!_typesByRelationTarget.TryGetValue(type.Target, out var typeList))
+            if (!_typesByRelationTarget.TryGetValue(type.Relation, out var typeSet))
             {
-                typeList = [];
-                _typesByRelationTarget[type.Target] = typeList;
+                typeSet = [];
+                _typesByRelationTarget[type.Relation] = typeSet;
             }
-
-            typeList.Add(type);
+            
+            typeSet.Add(type);
         }
 
-        foreach (var query in _queries.Values)
-        {
-            if (table.Matches(query.Mask))
-            {
-                query.TrackArchetype(table);
-            }
-        }
-
+        _typeGraph.Add(types, table);
         return table;
     }
 
 
-    internal void CollectTargets<T>(List<Identity> entities)
+    internal void CollectTargets<T>(List<Relate> entities)
     {
-        var type = TypeExpression.Of<T>(Match.Any);
+        var type = TypeExpression.Of<T>(Match.Entity);
 
+        // Modern LINQ version.
+        entities.AddRange(
+            from candidate in _tablesByType.Keys 
+            where type.Matches(candidate) 
+            select candidate.Relation);
+        
         // Iterate through tables and get all concrete Entities from their Archetype TypeExpressions
+        /*
         foreach (var candidate in _tablesByType.Keys)
+        {
             if (type.Matches(candidate))
-                entities.Add(candidate.Target);
+            {
+                entities.Add(candidate.Relation);
+            }
+        }
+        */
     }
     #endregion
 

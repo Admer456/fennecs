@@ -1,24 +1,18 @@
 ---
 layout: doc
 title: Entities
+order: 3
 ---
-
-![fennecs in a box](https://fennecs.tech/img/fennecs-1024.png)
-
 # Entities
-*(cuddly, incredibly lively, come in litters of 2,147,483,647)*
+
+![fennecs in a box](https://fennecs.tech/img/fennecs-512.png)
+
+*(cuddly, lively, come in litters of `1,073,741,824`)*
 
 An Entity is a specific type of ==Identity== (a 64-bit number) associated with a specific [World](/docs/World.md).
 
-Entities can have any number of [Components](/docs/Component.md) attached to them. This is how the **fenn**ecs Entity Component Systems provides composable, structured data semantics. 
+Entities can have any number of [Components](/docs/Components/) attached to them. This is how the **fenn**ecs Entity-Component Systems provides composable, structured data semantics. 
 
-Entities with the identical combinations of Component ==Type Expressions== share the same [[Archetype]].
-
-
-
-## CRUD - Create, Read, Update, Delete
-
-`fennecs.Entity` is a builder struct that combines its associated `fennecs.World` and `fennecs.Identity` to form an easily usable access pattern which exposes operations to add, remove, and read [Components](/docs/Component.md) , [Links](/docs/Link.md) , and [Relations](/docs/Relation.md). You can also conveniently Despawn the Entity.
+Entities with the identical combinations of Component ==Type Expressions== share the same [Archetype](../Components/index.md#archetype).
 
 
-The component data is accessed and processed in bulk through [Queries](/docs/Queries/), a typical way that ECS provide composable functionality.

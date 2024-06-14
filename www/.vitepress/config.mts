@@ -8,7 +8,7 @@ import { hyperlinkPlugin } from './plugin-hyperlink';
 export default defineConfig({
   lang: 'en-US',
   title: "fennecs — tiny ECS",
-  description: "fennecs ...the tiny, tiny, high-energy Entity Component System!",
+  description: "fennecs ...the tiny, tiny, high-energy Entity-Component System!",
 
   markdown: {
     config: (md) => {
@@ -27,8 +27,20 @@ export default defineConfig({
     ['link', { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" }],
     ['link', { rel: "manifest", href: "/site.webmanifest" }],
     ['link', { rel: "mask-icon", href: "/safari-pinned-tab.svg", color: "#142458" }],
+    ['meta', { name: "pinterest-rich-pin", content: "false" }],
     ['meta', { name: "msapplication-TileColor", content: "#142458" }],
-    ['meta', { name: "theme-color", content: "#ffffff" }],
+    ['meta', { name: "author", content: "⤜outfox⤏" }],
+    ['meta', { name: "theme-color", content: "#222222" }],
+    ['meta', { name: "twitter:card", content: "summary_large_image" }],    
+    ['meta', { name: "twitter:title", content: "fennecs ... the little ECS that loves you back! 🫶" }],    
+    ['meta', { name: "twitter:image", content: "https://fennecs.tech/img/meta-fennecs.png" }],    
+    ['meta', { name: "twitter:image:alt", content: "fennecs entity component system, logotype, white on orange" }],    
+    ['meta', { name: "twitter:description", content: "A free Entity-Component System written in pure C#! fennecs is fun, fast, and plays nice with game engines!" }],        
+    ['meta', { property: "og:title", content: "fennecs ... the little ECS that loves you back! 🫶" }],        
+    ['meta', { property: "og:description", content: "A free Entity-Component System written in pure C#! fennecs is fun, fast, and plays nice with game engines!" }],        
+    ['meta', { property: "og:image", content: "https://fennecs.tech/img/meta-fennecs.png" }],        
+    ['meta', { property: "twitter:image", content: "https://fennecs.tech/img/meta-fennecs.png" }],    
+    ['meta', { property: "author", content: "⤜outfox⤏" }],
   ],
 
 
@@ -37,17 +49,17 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Documentation', link: '/docs/index' },
-      { text: 'Examples', link: '/demos/index' },
+      { text: 'Discord', link: 'https://discord.gg/Bfx74WcVXW' },
     ],
 
     footer: {
-      message: '<a href="https://github.com/thygrrr/fennecs/?tab=MIT-1-ov-file#readme"><b>fenn</b>ecs</a> is released under the MIT License. <a href="https://volpeon.ink/emojis/neofox/">Neofox</a> is released under the CC BY-NC-SA 4.0 License.',
-      copyright: '<b>fenn</b>ecs is made with love & foxes, copyright © 2024 <a href="https://github.com/thygrrr/fennecs/graphs/contributors"> its contributors</a>'
+      message: '<a href="https://github.com/outfox/fennecs/?tab=MIT-1-ov-file#readme"><b>fenn</b>ecs</a> is released under the MIT License. <a href="https://volpeon.ink/emojis/neofox/">Neofox</a> is released under the CC BY-NC-SA 4.0 License.',
+      copyright: '<b>fenn</b>ecs is made with love & foxes, copyright © 2024 <a href="https://github.com/outfox/fennecs/graphs/contributors"> its contributors</a>'
     },
 
     sidebar: generateSidebar([
       {
-        sortMenusByName: true,
+        sortMenusByFrontmatterOrder: true,
         useFolderLinkFromIndexFile: true,
         useTitleFromFrontmatter: true,
         useFolderTitleFromIndexFile: true,
@@ -62,8 +74,8 @@ export default defineConfig({
     ]),
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/thygrrr/fennecs/' },
-      { icon: 'mastodon', link: 'https://mastodon.gamedev.place/@jupiter' },
+      { icon: 'github', link: 'https://github.com/outfox/fennecs/' },
+      { icon: 'discord', link: 'https://discord.gg/Bfx74WcVXW' },
     ],
   },
 })

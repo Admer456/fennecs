@@ -1,81 +1,34 @@
-﻿namespace fennecs.tests.Integration;
-using Position = System.Numerics.Vector3;
+﻿using System.Numerics;
+
+namespace fennecs.tests.Integration;
 
 public class DocumentationExampleTests
 {
+    record struct Position(Vector3 Value);
+    
     [Fact]
     public void QuickStart_Example_Works()
     {
         using var world = new World();
         var entity1 = world.Spawn().Add<Position>();
-        var entity2 = world.Spawn().Add(new Position(1, 2, 3)).Add<int>();
+        var entity2 = world.Spawn().Add(new Position(new(1, 2, 3))).Add<int>();
 
-        var query = world.Query<Position>().Build();
+        var query = world.Query<Position>(Match.Plain).Stream();
 
-        const float MULTIPLIER = 10f;
+        const float multiplier = 10f;
+        
+        foreach ((Entity, Position p) item in query)
+        {
+        }
+        
+        query.Job(multiplier,(float uniform, ref Position pos) => { pos.Value *= uniform; });
 
-        query.Job((ref Position pos, float uniform) => { pos *= uniform; }, MULTIPLIER, chunkSize: 2048);
-
-        var pos1 = world.GetComponent<Position>(entity1, default);
-        var expected = new Position() * MULTIPLIER;
+        var pos1 = world.GetComponent<Position>(entity1, Match.Plain);
+        var expected = new Position(pos1.Value * multiplier);
         Assert.Equal(expected, pos1);
 
-        var pos2 = world.GetComponent<Position>(entity2, default);
-        expected = new Position(1, 2, 3) * MULTIPLIER;
+        var pos2 = world.GetComponent<Position>(entity2, Match.Plain);
+        expected = new Position( new Vector3(1, 2, 3) * multiplier);
         Assert.Equal(expected, pos2);
-    }
-
-    private struct TypeA;
-
-    [Theory]
-    [InlineData(2769, 2_001)]
-    [InlineData(18_000, 2_000)]
-    [InlineData(20_000, 1_999)]
-    [InlineData(1_200, 37)]
-    public void Can_Iterate_Multiple_Chunks(int count, int chunkSize)
-    {
-        
-        using var world = new World();
-        for (var i = 0; i < count; i++)
-        {
-            world.Spawn()
-                .Add(new Position(1,2,3))
-                .Add<int>()
-                .Add<float>()
-                .Add("string string")
-                .Add<TypeA>();
-        }
-
-        var query1 = world.Query<Position>().Build();
-        var query2 = world.Query<Position, int>().Build();
-        var query3 = world.Query<float, Position, int>().Build();
-        var query4 = world.Query<Identity, string, Position, int>().Build();
-        var query5 = world.Query<Position, int, float, string, TypeA>().Build();
-
-        query1.Job((ref Position _) =>
-        {
-        }, chunkSize: chunkSize);
-        Assert.Equal(count, query1.Count);
-
-        query2.Job((ref Position _, ref int _) =>
-        {
-        }, chunkSize: chunkSize);
-        Assert.Equal(count, query2.Count);
-
-        query3.Job((ref float _, ref Position _, ref int _) =>
-        {
-        }, chunkSize: chunkSize);
-        Assert.Equal(count, query3.Count);
-
-        query4.Job((ref Identity _, ref string _, ref Position _, ref int _) =>
-        {
-        }, chunkSize: chunkSize);
-        Assert.Equal(count, query4.Count);
-
-        query5.Job((ref Position _, ref int _, ref float _, ref string _, ref TypeA _) =>
-        {
-        }, chunkSize: chunkSize);
-        Assert.Equal(count, query5.Count);
-        
     }
 }

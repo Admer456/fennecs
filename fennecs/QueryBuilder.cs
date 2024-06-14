@@ -1,379 +1,227 @@
-// SPDX-License-Identifier: MIT
-
-// ReSharper disable MemberCanBePrivate.Global
-
-using fennecs.pools;
+﻿using fennecs.pools;
 
 namespace fennecs;
 
-public class QueryBuilder : IDisposable
+/// <summary>
+/// A QueryBuilder provides a fluent API to construct Queries into a <see cref="fennecs.World"/>.
+/// Queries use Query Expressions to Match Entities based on their Components, Relations, or Object Links.
+/// </summary>
+/// <typeparam name="QB">F-bound polymorphic / CRTP type reference to own type, so inheritors
+/// can inherit all their methods with the appropriate return types</typeparam>
+public abstract class QueryBuilderBase<QB> : IDisposable where QB : QueryBuilderBase<QB>
 {
-    internal readonly World World;
-    protected readonly Mask Mask = MaskPool.Rent();
+    #region Builder State
 
-    protected readonly PooledList<TypeExpression> StreamTypes = PooledList<TypeExpression>.Rent();
+    private Mask _mask = MaskPool.Rent();
+    private bool _disposed;
 
-    /* TODO: Implement deferred builder
-    private List<ValueTuple<Type, Identity, object>> _has;
-    private List<ValueTuple<Type, Identity, object>> _not;
-    private List<ValueTuple<Type, Identity, object>> _any;
-    */
+    private readonly World _world;
 
-
-    internal QueryBuilder(World world)
+    /// <summary>
+    /// A QueryBuilder provides a fluent API to construct Queries into a <see cref="fennecs.World"/>.
+    /// Queries use Query Expressions to Match Entities based on their Components, Relations, or Object Links.
+    /// </summary>
+    /// <param name="world"><see cref="fennecs.World"/> to build queries for</param>
+    /// <param name="streamTypes">list of types that must be guaranteed to be on the Query's Mask for Stream Creation</param>
+    protected private QueryBuilderBase(World world, Span<TypeExpression> streamTypes)
     {
-        World = world;
+        _world = world;
+        foreach (var type in streamTypes) _mask.Has(type);
+        
+        // TODO: need to agree with myself what I can do about including Identity or not.
+        if (!_mask.HasTypes.Contains(Component.PlainComponent<Identity>().value))
+            _mask.Has(Component.PlainComponent<Identity>().value);
     }
+
+    #endregion
+
+    #region Compilation Interface
+
+    /// <summary>
+    /// Builds (compiles) the Query from the current state of the QueryBuilder.
+    /// </summary>
+    /// <remarks>
+    /// This method is covariant, so you will get the appropriate stream Query subclass
+    /// depending on the Stream Types (type parameters) you passed to <see cref="fennecs.World.Query{C}()"/>
+    /// or any of its overloads.
+    /// </remarks>
+    /// <returns>compiled query (you can compile more than one query from the same builder)</returns>
+    public Query Compile() => _world.CompileQuery(_mask);
+
+    #endregion
+
+    #region Builder Interface
+
+    /// <summary>
+    /// QueryBuilder includes only Entities that have the given Component, Relation, or Object Link.
+    /// </summary>
+    /// <param name="match">defaults th Plain Components. Can be a match wildcard or specific relation target / or object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Has<T>(Match match = default)
+    {
+        _mask.Has(TypeExpression.Of<T>(match));
+        return (QB)this;
+    }
+
+    
+    /// <summary>
+    /// QueryBuilder includes only Entities that have the given Component, Relation, or Object Link.
+    /// </summary>
+    /// <param name="link">an object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Has<T>(Link<T> link) where T : class
+    {
+        _mask.Has(TypeExpression.Of<T>(link));
+        return (QB)this;
+    }
+
 
 
     /// <summary>
-    /// 
+    /// Exclude all Entities that have the given Component or Relation.
     /// </summary>
-    /// <param name="target"></param>
-    /// <typeparam name="T"></typeparam>
-    protected void Outputs<T>(Identity target = default)
+    /// <param name="match">defaults th Plain Components. Can be a match wildcard or specific relation target / or object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Not<T>(Match match = default)
     {
-        var typeExpression = TypeExpression.Of<T>(target);
-        StreamTypes.Add(typeExpression);
-        Mask.Has(typeExpression);
+        _mask.Not(TypeExpression.Of<T>(match));
+        return (QB)this;
     }
 
-
-    public virtual QueryBuilder Has<T>(Identity target = default)
+    /// <summary>
+    /// Exclude all Entities that have the given Component or Relation.
+    /// </summary>
+    /// <param name="link">an object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Not<T>(Link<T> link) where T : class
     {
-        var typeExpression = TypeExpression.Of<T>(target);
-        if (StreamTypes.Contains(typeExpression)) throw new InvalidOperationException($"Type {typeExpression} is already an output of this query.");
-
-        Mask.Has(typeExpression);
-        return this;
+        _mask.Not(TypeExpression.Of<T>(link));
+        return (QB)this;
     }
 
-
-    public virtual QueryBuilder Has<T>(T target) where T : class
+    /// <summary>
+    /// Include Entities that have the given Component or Relation, or any other Relation that is
+    /// given in other <see cref="Any{T}(Match)"/> calls.
+    /// </summary>
+    /// <param name="match">defaults th Plain Components. Can be a match wildcard or specific relation target / or object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Any<T>(Match match = default)
     {
-        Mask.Has(TypeExpression.Of<T>(Identity.Of(target)));
-        return this;
+        _mask.Any(TypeExpression.Of<T>(match));
+        return (QB)this;
     }
 
-
-    public virtual QueryBuilder Not<T>(Identity target = default)
+    /// <summary>
+    /// Include Entities that have the given Component or Relation, or any other Relation that is
+    /// given in other <see cref="Any{T}(Match)"/> calls.
+    /// </summary>
+    /// <param name="link">an object link</param>
+    /// <typeparam name="T">component's backing type</typeparam>
+    /// <returns>itself (fluent pattern)</returns>
+    /// <exception cref="InvalidOperationException">if the StreamTypes already cover this or conflict with it</exception>
+    public QB Any<T>(Link<T> link) where T : class
     {
-        Mask.Not(TypeExpression.Of<T>(target));
-        return this;
+        _mask.Any(TypeExpression.Of<T>(link));
+        return (QB)this;
     }
+    
+    #endregion
 
+    # region IDisposable
 
-    public virtual QueryBuilder Not<T>(T target) where T : class
-    {
-        var typeExpression = TypeExpression.Of<T>(Identity.Of(target));
-
-        Mask.Not(typeExpression);
-        return this;
-    }
-
-
-    public virtual QueryBuilder Any<T>(Identity target = default)
-    {
-        Mask.Any(TypeExpression.Of<T>(target));
-        return this;
-    }
-
-
-    public virtual QueryBuilder Any<T>(T target) where T : class
-    {
-        Mask.Any(TypeExpression.Of<T>(Identity.Of(target)));
-        return this;
-    }
-
-
+    /// <inheritdoc cref="IDisposable"/>
     public void Dispose()
     {
-        Mask.Dispose();
-        StreamTypes.Dispose();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        
+        _disposed = true;
+        _mask.Dispose();
+        _mask = null!;
+        GC.SuppressFinalize(this);
     }
+
+    /// <inheritdoc cref="IDisposable"/>
+    ~QueryBuilderBase() => Dispose();
+
+    #endregion
 }
 
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder(World world) : QueryBuilderBase<QueryBuilder>(world, []);
 
-public sealed class QueryBuilder<C1> : QueryBuilder
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder<C1>(World world, Match match1 = default)
+    : QueryBuilderBase<QueryBuilder<C1>>(world, [TypeExpression.Of<C1>(match1)])
+    where C1 : notnull
 {
-    private static readonly Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> CreateQuery =
-        (world, streamTypes, mask, matchingTables) => new Query<C1>(world, streamTypes, mask, matchingTables);
-
-
-    internal QueryBuilder(World world, Identity match = default) : base(world)
-    {
-        Outputs<C1>(match);
-    }
-
-
-    public Query<C1> Build()
-    {
-        return (Query<C1>) World.GetQuery(StreamTypes, Mask, CreateQuery);
-    }
-
-
-    public override QueryBuilder<C1> Has<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1>) base.Has<T>(target);
-    }
-
-
-    public override QueryBuilder<C1> Has<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1>) base.Has(target);
-    }
-
-
-    public override QueryBuilder<C1> Not<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1>) base.Not<T>(target);
-    }
-
-
-    public override QueryBuilder<C1> Not<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1>) base.Not(target);
-    }
-
-
-    public override QueryBuilder<C1> Any<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1>) base.Any<T>(target);
-    }
-
-
-    public override QueryBuilder<C1> Any<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1>) base.Any(target);
-    }
+    /// <include file='XMLdoc.xml' path='members/member[@name="T:Stream"]'/>
+    public Stream<C1> Stream() => Compile().Stream<C1>(match1);
 }
 
-
-public sealed class QueryBuilder<C1, C2> : QueryBuilder
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder<C1, C2>(World world, Match match1, Match match2)
+    : QueryBuilderBase<QueryBuilder<C1, C2>>(world, [TypeExpression.Of<C1>(match1), TypeExpression.Of<C2>(match2)])
+    where C1 : notnull
+    where C2 : notnull
 {
-    private static readonly Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> CreateQuery =
-        (world, streamTypes, mask, matchingTables) => new Query<C1, C2>(world, streamTypes, mask, matchingTables);
+    /// <inheritdoc cref="QueryBuilderBase{QB}"/>
+    public QueryBuilder(World world, Match matchAll = default) : this(world, matchAll, matchAll) { }
 
-
-    internal QueryBuilder(World world, Identity match1, Identity match2) : base(world)
-    {
-        Outputs<C1>(match1);
-        Outputs<C2>(match2);
-    }
-
-
-    public Query<C1, C2> Build()
-    {
-        return (Query<C1, C2>) World.GetQuery(StreamTypes, Mask, CreateQuery);
-    }
-
-
-    public override QueryBuilder<C1, C2> Has<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2>) base.Has<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2> Has<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2>) base.Has(target);
-    }
-
-
-    public override QueryBuilder<C1, C2> Not<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2>) base.Not<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2> Not<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2>) base.Not(target);
-    }
-
-
-    public override QueryBuilder<C1, C2> Any<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2>) base.Any<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2> Any<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2>) base.Any(target);
-    }
+    /// <include file='XMLdoc.xml' path='members/member[@name="T:Stream"]'/>
+    public Stream<C1, C2> Stream() => Compile().Stream<C1, C2>(match1, match2);
 }
 
-
-public sealed class QueryBuilder<C1, C2, C3> : QueryBuilder
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder<C1, C2, C3>(World world, Match match1, Match match2, Match match3)
+    : QueryBuilderBase<QueryBuilder<C1, C2, C3>>(world, [TypeExpression.Of<C1>(match1), TypeExpression.Of<C2>(match2), TypeExpression.Of<C3>(match3)])
+    where C1 : notnull
+    where C2 : notnull
+    where C3 : notnull
 {
-    private static readonly Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> CreateQuery =
-        (world, streamTypes, mask, matchingTables) => new Query<C1, C2, C3>(world, streamTypes, mask, matchingTables);
+    /// <inheritdoc cref="QueryBuilderBase{QB}"/>
+    public QueryBuilder(World world, Match matchAll = default) : this(world, matchAll, matchAll, matchAll) { }
 
-
-    internal QueryBuilder(World world, Identity match1, Identity match2, Identity match3) : base(world)
-    {
-        Outputs<C1>(match1);
-        Outputs<C2>(match2);
-        Outputs<C3>(match3);
-    }
-
-
-    public Query<C1, C2, C3> Build()
-    {
-        return (Query<C1, C2, C3>) World.GetQuery(StreamTypes, Mask, CreateQuery);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Has<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Has<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Has<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Has(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Not<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Not<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Not<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Not(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Any<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Any<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3> Any<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3>) base.Any(target);
-    }
+    /// <include file='XMLdoc.xml' path='members/member[@name="T:Stream"]'/>
+    public Stream<C1, C2, C3> Stream() => Compile().Stream<C1, C2, C3>(match1, match2, match3);
 }
 
-
-public sealed class QueryBuilder<C1, C2, C3, C4> : QueryBuilder
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder<C1, C2, C3, C4>(World world, Match match1, Match match2, Match match3, Match match4)
+    : QueryBuilderBase<QueryBuilder<C1, C2, C3, C4>>(world, [ TypeExpression.Of<C1>(match1), TypeExpression.Of<C2>(match2), TypeExpression.Of<C3>(match3), TypeExpression.Of<C4>(match4) ])
+    where C1 : notnull
+    where C2 : notnull
+    where C3 : notnull
+    where C4 : notnull
 {
-    private static readonly Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> CreateQuery =
-        (world, streamTypes, mask, matchingTables) => new Query<C1, C2, C3, C4>(world, streamTypes, mask, matchingTables);
+    /// <inheritdoc cref="QueryBuilderBase{QB}"/>
+    public QueryBuilder(World world, Match matchAll = default) : this(world, matchAll, matchAll, matchAll, matchAll) { }
 
-
-    internal QueryBuilder(World world, Identity match1, Identity match2, Identity match3, Identity match4) : base(world)
-    {
-        Outputs<C1>(match1);
-        Outputs<C2>(match2);
-        Outputs<C3>(match3);
-        Outputs<C4>(match4);
-    }
-
-
-    public Query<C1, C2, C3, C4> Build()
-    {
-        return (Query<C1, C2, C3, C4>) World.GetQuery(StreamTypes, Mask, CreateQuery);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Has<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Has<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Has<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Has(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Not<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Not<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Not<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Not(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Any<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Any<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4> Any<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4>) base.Any(target);
-    }
+    /// <include file='XMLdoc.xml' path='members/member[@name="T:Stream"]'/>
+    public Stream<C1, C2, C3, C4> Stream() => Compile().Stream<C1, C2, C3, C4>(match1, match2, match3, match4);
 }
 
-
-public sealed class QueryBuilder<C1, C2, C3, C4, C5> : QueryBuilder
+/// <inheritdoc cref="QueryBuilderBase{QB}"/>
+public class QueryBuilder<C1, C2, C3, C4, C5>(World world, Match match1, Match match2, Match match3, Match match4, Match match5)
+    : QueryBuilderBase<QueryBuilder<C1, C2, C3, C4, C5>>(world, [ TypeExpression.Of<C2>(match2), TypeExpression.Of<C3>(match3), TypeExpression.Of<C4>(match4), TypeExpression.Of<C5>(match5) ])
+    where C1 : notnull
+    where C2 : notnull
+    where C3 : notnull
+    where C4 : notnull
+    where C5 : notnull
 {
-    private static readonly Func<World, List<TypeExpression>, Mask, List<Archetype>, Query> CreateQuery =
-        (world, streamTypes, mask, matchingTables) => new Query<C1, C2, C3, C4, C5>(world, streamTypes, mask, matchingTables);
+    /// <inheritdoc cref="QueryBuilderBase{QB}"/>
+    public QueryBuilder(World world, Match matchAll = default) : this(world, matchAll, matchAll, matchAll, matchAll, matchAll) { }
 
-
-    internal QueryBuilder(World world, Identity match1, Identity match2, Identity match3, Identity match4, Identity match5) : base(world)
-    {
-        Outputs<C1>(match1);
-        Outputs<C2>(match2);
-        Outputs<C3>(match3);
-        Outputs<C4>(match4);
-        Outputs<C5>(match5);
-    }
-
-
-    public Query<C1, C2, C3, C4, C5> Build()
-    {
-        return (Query<C1, C2, C3, C4, C5>) World.GetQuery(StreamTypes, Mask, CreateQuery);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Has<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Has<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Has<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Has(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Not<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Not<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Not<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Not(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Any<T>(Identity target = default)
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Any<T>(target);
-    }
-
-
-    public override QueryBuilder<C1, C2, C3, C4, C5> Any<T>(T target) where T : class
-    {
-        return (QueryBuilder<C1, C2, C3, C4, C5>) base.Any(target);
-    }
+    /// <include file='XMLdoc.xml' path='members/member[@name="T:Stream"]'/>
+    public Stream<C1, C2, C3, C4, C5> Stream() => Compile().Stream<C1, C2, C3, C4, C5>(match1, match2, match3, match4, match5);
 }

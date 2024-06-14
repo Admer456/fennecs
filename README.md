@@ -1,15 +1,16 @@
 ![fennecs logo](./www/logos/fennecs-logo-darkmode.svg#gh-dark-mode-only) ![fennecs logo](./www/logos/fennecs-logo-lightmode.svg#gh-light-mode-only)
 
-# _... the tiny, tiny, high-energy Entity Component System!_
+# _... the tiny, tiny, high-energy Entity-Component System!_
 
 <table style="width: 100%">
    <tr>
       <th colspan="2">
+         <a href="https://discord.gg/3SF4gWhANS"><img alt="Discord" src="https://img.shields.io/badge/Discord-_%E2%A4%9Coutfox%E2%A4%8F-blue?logo=discord&logoColor=f5f5f5"/></a>
          <a href="https://www.nuget.org/packages/fennecs/"><img alt="Nuget" src="https://img.shields.io/nuget/v/fennecs?color=blue"/></a>
-         <a href="https://github.com/thygrrr/fennECS/actions"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/thygrrr/fennecs/xUnit.yml"/></a>
-         <a href="https://github.com/thygrrr/fennECS/issues"><img alt="Open issues" src="https://img.shields.io/github/issues-raw/thygrrr/fennecs?color=green"/></a>
+         <a href="https://github.com/outfox/fennecs/actions"><img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/outfox/fennecs/xUnit.yml"/></a>
+         <a href="https://github.com/outfox/fennecs/issues"><img alt="Open issues" src="https://img.shields.io/github/issues-raw/outfox/fennecs?color=green"/></a>
          <img alt="GitHub top language" src="https://img.shields.io/badge/C%23-100%25_-blue"/>
-         <a href="https://github.com/thygrrr/fennECS?tab=MIT-1-ov-file#readme"><img alt="License: MIT" src="https://img.shields.io/github/license/thygrrr/fennecs?color=blue"/></a>
+         <a href="https://github.com/outfox/fennecs?tab=MIT-1-ov-file#readme"><img alt="License: MIT" src="https://img.shields.io/github/license/outfox/fennecs?color=blue"/></a>
       </th>
    </tr>
    <tr>
@@ -38,8 +39,8 @@
    </tr>
 </table>
 
-# [fennecs.tech](https://fennecs.tech) (official website) 
-Grab a cup of coffee to [get started](https://fennecs.tech), try [the Cookbook](https://fennecs.tech/cookbook/), view [the Demos](https://fennecs.tech/demos/) , and more!  
+# 📕 DOCUMENTATION: [fennecs.tech](https://fennecs.tech) (official website) 
+Grab a cup of coffee to [get started](https://fennecs.tech), try [the Cookbook](https://fennecs.tech/cookbook/), view [the Demos](https://fennecs.tech/examples/) , and more!  
 ![coffee cup](https://fennecs.tech/emoji/neofox_cofe.png) 
 
 ## Quickstart: Let's go!
@@ -47,9 +48,9 @@ Grab a cup of coffee to [get started](https://fennecs.tech), try [the Cookbook](
 
 At the basic level, all you need is a 🧩**component type**, a number of ~~small foxes~~ 🦊**entities**, and a query to ⚙️**iterate and modify** components, occasionally passing in some uniform 💾**data**.
 
-```csharp
-// Declare your own component types. (you can also use most existing value or reference types)
-using Velocity = System.Numerics.Vector3;
+```cs
+// Declare a component record. (we can also use most existing value & reference types)
+record struct Velocity(Vector3 Value);
 
 // Create a world. (fyi, World implements IDisposable)
 var world = new fennecs.World();
@@ -57,13 +58,17 @@ var world = new fennecs.World();
 // Spawn an entity into the world with a choice of components. (or add/remove them later)
 var entity = world.Spawn().Add<Velocity>();
 
-// Queries are cached, just build them right where you want to use them.
-var query = world.Query<Velocity>().Build();
+// Queries are cached & we use ultra-lightweight Stream Views to feed data to our code!
+var stream = world.Query<Velocity>().Stream();
 
-// Run code on all entities in the query. (omit chunksize to parallelize only by archetype)
-query.Job(static (ref Velocity velocity, float dt) => {
-    velocity.Y -= 9.81f * dt;
-}, uniform: Time.Delta, chunkSize: 2048);
+// Run code on all entities in the query. (exchange 'For' with 'Job' for parallel processing)
+stream.For(
+    uniform: DeltaTime * 9.81f * Vector3.UnitZ,
+    action: (Vector3 uniform, ref Velocity velocity) =>
+    {
+        velocity.Value -= uniform;
+    }
+);
 ```
 
 #### 💢... when we said minimal boilerplate, <em>we meant it.</em>
@@ -79,7 +84,7 @@ So how does _**fenn**ecs_ compare to other ECSs?
 This library is a tiny, tiny ECS with a focus on good performance and great simplicity. But it *cares enough* to provide a few things you might not expect.
 
 > [!IMPORTANT]
-> The idea of _**fenn**ecs_ was to fill the gaps that the author felt working with various established Entity Component Systems. This is why this matrix is clearly imbalanced, it's a shopping list of things that _**fenn**ecs_ does well and was made to do
+> The idea of _**fenn**ecs_ was to fill the gaps that the author felt working with various established Entity-Component Systems. This is why this matrix is clearly imbalanced, it's a shopping list of things that _**fenn**ecs_ does well and was made to do
 well; and things it may aspire to do but compromised on in order to be able to achieve the others.
 >
 > <em>(TL;DR - Foxes are soft, choices are hard - Unity dumb, .NET 8 really sharp.)</em>
@@ -95,7 +100,7 @@ well; and things it may aspire to do but compromised on in order to be able to a
 |:--------------------------------------------------------------------------|:----------------------------------:|:------------------------------------:|:-------:|:--------------------------------:|:--------------------------------:|
 | Boilerplate-to-Feature Ratio                                              |               3-to-1               |                5-to-1                | 12-to-1 |            27-to-1 😱            |              7-to-1              |
 | Entity-Component Queries                                                  |                 ✅                  |                  ✅                   |    ✅    |                ✅                 |                ✅                 |
-| Entity-Target Relations                                                   |                 ✅                  |                  ✅                   |    ❌    |                ❌                 | ✅<br/><sup>(Map/MultiMap)</sup> |
+| Entity-Entity Relations                                                   |                 ✅                  |                  ✅                   |    ❌    |                ❌                 | ✅<br/><sup>(Map/MultiMap)</sup> |
 | Entity-Object-Relations                                                   |                 ✅                  | 🟨</br><sup>(System.Type only)</sup> |    ❌    |                ❌                 |                ❌                 |
 | Target Querying<br/>*<sup>(find all targets of specific relations)</sup>* |                 ✅                  |                  ❌                   |    ❌    |                ❌                 |                ✅                 |
 | Wildcard Semantics<br/>*<sup>(match multiple relations in 1 query)</sup>* |                 ✅                  |                  ❌                   |    ❌    |                ❌                 |                ❌                 |
@@ -105,7 +110,7 @@ well; and things it may aspire to do but compromised on in order to be able to a
 | Reference Component Types                                                 |                 ✅                  |                  ❌                   |    ❌    |                ❌                 |                ❌                 |
 | Arbitrary Component Types                                                 |                 ✅                  | ✅<br/><sup>(value types only)</sup>  |    ❌    |                ❌                 |                ✅                 |
 | Structural Change Events                                                  |    🟨<br/><sup>(planned)</sup>     |                  ❌                   |    ✅    |  ☠️<br/><sup>(unreliable)</sup>  |                ❌                 |
-| Workload Scheduling                                                       |      🟨<br/><sup>(planned)</sup>      |                  ❌                   |      ❌  | ✅<br/><sup>(highly static)</sup> |                ✅                 |
+| Workload Scheduling                                                       |                 ❌                  |                  ❌                   |      ❌  | ✅<br/><sup>(highly static)</sup> |                ✅                 |
 | No Code Generation Required                                               |                 ✅                  |                  ✅                   |    ❌    |                ❌                 | 🟨<br/><sup>(roslyn addon)</sup> |
 | Enqueue Structural Changes at Any Time                                    |                 ✅                  |                  ✅                   |    ✅    | 🟨<br/><sup>(restrictive)</sup>  |                🟨                |
 | Apply Structural Changes at Any Time                                      |                 ❌                  |                  ❌                   |    ✅    |                ❌                 |                ❌                 |
