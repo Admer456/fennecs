@@ -47,7 +47,7 @@ public readonly record struct Entity : IAddRemoveComponent<Entity>, IHasComponen
     /// <summary>
     /// The World in which the Entity exists.
     /// </summary>
-    public readonly World => _world;
+    public readonly World World => _world;
 
 
     /// <summary>
