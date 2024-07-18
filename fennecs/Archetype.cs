@@ -356,6 +356,20 @@ public sealed class Archetype : IEnumerable<Entity>, IComparable<Archetype>
         destination.PatchMetas(destination.Count-1);
     }
 
+    internal Component[] GetRow(int row)
+    {
+        // -1 because we skip IdentityStorage
+        using var components = PooledList<Component>.Rent();
+        
+        foreach (var (expression, index) in _storageIndices)
+        {
+            var storage = Storages[index];
+            if (storage == IdentityStorage) continue;
+            components.Add(new(expression, storage.Box(row), _world));
+        }
+        
+        return components.ToArray();
+    }
 
     /// <inheritdoc />
     public int CompareTo(Archetype? other)

@@ -57,11 +57,14 @@ public sealed class EntitySpawner : IDisposable, IAddRemoveComponent<EntitySpawn
     /// <returns>EntitySpawner (fluent interface)</returns>
     public EntitySpawner Add<T>(T component) where T : notnull
     {
-        var type = Component.PlainComponent<T>().value;
+        var type = Comp<T>.Plain.Expression;
         return AddComponent(type, component);
     }
-    
-    
+
+    /// <inheritdoc />
+    public EntitySpawner Add<T>(Entity target) where T : notnull, new() => Add(new T(), target);
+
+
     /// <inheritdoc />
     public EntitySpawner Add<C>() where C : notnull, new() => Add(new C());
     
@@ -81,12 +84,6 @@ public sealed class EntitySpawner : IDisposable, IAddRemoveComponent<EntitySpawn
         return AddComponent(type, target.Object);
     }
     
-    /// <inheritdoc />
-    public EntitySpawner Add<T>(Entity relation) where T : notnull, new()
-    {
-        return Add(new T(), relation);
-    }
-
 
     /// <inheritdoc cref="Entity.Remove{C}()"/>
     /// <summary>
@@ -95,7 +92,7 @@ public sealed class EntitySpawner : IDisposable, IAddRemoveComponent<EntitySpawn
     /// <returns>EntitySpawner (fluent interface)</returns>
     public EntitySpawner Remove<T>() where T : notnull
     {
-        var type = Component.PlainComponent<T>().value;
+        var type = Comp<T>.Plain.Expression;
         return RemoveComponent(type);
     }
 

@@ -1,44 +1,70 @@
 ---
 title: per-Entity CRUD
-order: 2
+order: 4
+outline: [1, 2]
 ---
 
-# per-Entity Create, Read, Update, Delete
+# Create, Read, Update, Delete
 
 `fennecs.Entity` is a builder struct that combines its associated `fennecs.World` and `fennecs.Identity` to form an easily usable access pattern which exposes operations to add, remove, and read [Components](/docs/Components/) , [Links](/docs/Components/Link.md) , and [Relations](/docs/Components/Relation.md). You can also conveniently Despawn the Entity.
 
 
 The component data is accessed and processed in bulk through [Queries](/docs/Queries/), a typical way that ECS provide composable functionality.
 
-## `World.Spawn()`
-Entities are created through the World's `Spawn()` function, which returns a `fennecs.Entity` builder struct that operates directly on the Entity's ==Identity== in that World.
 
-## `Entity.Despawn()`
-Despawns the Entity from its World.
+## Specific Component Operations
 
-## `Entity.Add<T>(T component)` & <br/> `Entity.Remove<T>(T component)`
-Adds or removes a component to the Entity. `T` can be of practically any value or reference type. If `T` is newable (`where T: new()`), a default instance can be created if none is provided as a parameter.
+ `Ref<T>()`: Get a reference to a component
+ `Ref<T>(Entity relation)`: Get a reference to a component backing a relation (useful for reassigning the value, but not the relation)
 
-Use of `null` values is discouraged. *(currently disallowed - looking for feedback)*
+- `Get<T>(Match match)`: Gets all components matching the expression; e.g. `entity.Get<MyLinkType>(Link.Any)` to get all the Links.
 
-## `Entity.AddRelation<T>(T component)` & <br/>`Entity.RemoveRelation<T>(T component)`
-Adds or removes a relation (and its backing component data) to the Entity.
+- `Components`: Returns an `IReadonlyList<Component>` of all components on the entity. See [Boxed Components](/docs/Components/Expressions.md#boxed-components) for more information.
 
-## `Entity.AddLink<L>(L object)` & <br/>`Entity.RemoveLink<L>(L object)`
-Adds or removes an Object Link to the Entity. [Object Links](/docs/Components/Link.md) are objects who, in addition to be added as component data, serve the purpose of Archetype grouping entities.
 
-::: info :neofox_book: USE CASES
-Object Links are very powerful because they create a natural division of labor in your runner code by means of creating an [Archetype](/docs/Components/index.md#archetype) for each Link. Unless you have high Entity counts or a definitive multi-threaded use case, you will only get semantic gains from this type of relationship
 
-* grouping Entities by physics worlds, and pumping these worlds in separate threads and copying data from and to each entity there
-* grouping Entities by scene hierarchy roots, network connections, or other things that naturally constitute a rarely changing grouping criterion
-:::
+## Interface `IAddRemoveComponent`
 
-::: info SUB-OPTIMAL USES
-If you only need to a way to make available multiple objects of type `L` to an Entity in a runner, consider adding a component of type `L[]` or `List<L>` to the Entity instead.
+The `IAddRemoveComponent<SELF>` interface provides methods for adding and removing components from entities or sets of entities. It follows a fluent pattern, allowing chained method calls.
 
-If you need a 'shared' component, consider just using a reference type Component instead of a Link (the same object can be used as a component on any number of Entities).
-:::
+### :neofox_cute_reach: Adding Components :neofox_hug_haj_heart:
+
+- `Add<C>()`: Adds a default, plain newable component of type `C` to the entity/entities.
+- `Add<C>(C value)`: Adds a plain component with the specified value of type `C` to the entity/entities.
+- `Add<T>(Entity relation)`: Adds a newable relation component backed by a default value of type `T` to the entity/entities.
+- `Add<R>(R value, Entity relation)`: Adds a relation component backed by the specified value of type `R` to the entity/entities.
+- `Add<L>(Link<L> link)`: Adds an object link component with an object of type `L` to the entity/entities.
+
+### :neofox_hug_haj: Removing Components :neofox_floof_sad_reach:
+
+- `Remove<C>()`: Removes a plain component of type `C` from the entity/entities.
+- `Remove<R>(Entity relation)`: Removes a relation component of type `R` with the specified relation from the entity/entities.
+- `Remove<L>(L linkedObject)`: Removes an object link component with the specified linked object from the entity/entities.
+- `Remove<L>(Link<L> link)`: Removes an object link component with the specified link from the entity/entities.
+
+All methods return the interface itself (`SELF`), allowing for fluent method chaining.
+
+Note: The type parameters `C`, `T`, `R`, and `L` have constraints to ensure they are non-null and/or class types.
+
+## Interface `IHasComponent`
+
+The `IHasComponent` interface provides methods for checking the presence of components on an entity or set of entities. 
+
+### Has Component :neofox_verified:
+
+- `Has<C>()`: Checks if the entity/entities has a plain component of type `C`.
+- `Has<R>(Entity relation)`: Checks if the entity/entities has a relation component of type `R` with the specified relation.
+- `Has<L>(L linkedObject)`: Checks if the entity/entities has an object link component with the specified linked object.
+- `Has<L>(Link<L> link)`: Checks if the entity/entities has an object link component with the specified link.
+
+All `Has` methods return a boolean value indicating whether the entity/entities has the specified component. Therefore, they can only be at the end of a chain.
+
+Note: The type parameters `C`, `R`, and `L` have constraints to ensure they are non-null and/or class types.
+
+
+## `Entity.Despawn` :neofox_x_x:
+- `Entity.Despawn()`: Despawns the Entity from its World.
+
 
 
 ## Caveats

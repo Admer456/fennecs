@@ -170,14 +170,14 @@ public class EntitySpawnerTests
     {
         using var world = new World();
         var other = world.Spawn();
-        using var spawner1 = world.Entity().Add<Type69>(other); 
+        using var spawner1 = world.Entity().Add<Type69>(new(), other); 
         spawner1.Spawn();
         
         using var query1 = world.Query<Type69>(other).Compile();
         Assert.Equal(1, query1.Count);
         Assert.Equal(2, world.Count);
 
-        using var spawner2 = world.Entity().Add<Type42>(new(), other); 
+        using var spawner2 = world.Entity().Add<Type42>(other);  // Newable implcit new()
         spawner2.Spawn();
         
         using var query2 = world.Query<Type42>(other).Compile();
@@ -198,7 +198,7 @@ public class EntitySpawnerTests
     {
         using var world = new World();
         var other = world.Spawn();
-        using var spawner1 = world.Entity().Add<Type69>(other); 
+        using var spawner1 = world.Entity().Add<Type69>(new(), other); 
         spawner1.Spawn();
         
         using var query1 = world.Query<Type69>(other).Compile();

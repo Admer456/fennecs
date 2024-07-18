@@ -231,6 +231,37 @@ public readonly record struct Entity : IAddRemoveComponent<Entity>, IHasComponen
     /// Checks if the Entity has an Object Link of a specific type and specific target.
     /// </summary>
     public bool Has<T>(Link<T> link) where T : class => _world.HasComponent<T>(Id, link);
+
+    /// <summary>
+    /// Boxes all the Components on the entity into an array.
+    /// Use sparingly, but don't be paranoid. Suggested uses: serialization and debugging.
+    /// </summary>
+    /// <remarks>
+    /// Values and References are copied, changes to the array will not affect the Entity.
+    /// Changes to objects in the array will affect these objects in the World.
+    /// This array is re-created every time this getter is called.
+    /// The values are re-boxed each time this getter is called.
+    /// </remarks>
+    public IReadOnlyList<Component> Components => _world.GetComponents(Id);
+    
+    
+    /// <summary>
+    /// Gets all Components of a specific type and match expression on the Entity.
+    /// Supports relation Wildcards, for example:<ul>
+    /// <li><see cref="Entity.Any">Entity.Any</see></li>
+    /// <li><see cref="Link.Any">Link.Any</see></li>
+    /// <li><see cref="Match.Target">Match.Target</see></li>
+    /// <li><see cref="Match.Any">Match.Any</see></li>
+    /// <li><see cref="Match.Plain">Match.Plain</see></li>
+    /// </ul>
+    /// </summary>
+    /// <remarks>
+    /// This is not intended as the main way to get a component from an entity. Consider <see cref="Stream"/>s instead.
+    /// </remarks>
+    /// <param name="match">match expression, supports wildcards</param>
+    /// <typeparam name="T">backing type of the component</typeparam>
+    /// <returns>array with all the component values stored for this entity</returns>
+    public T[] Get<T>(Match match) => _world.Get<T>(Id, match);  
     
     #endregion
 
@@ -265,7 +296,7 @@ public readonly record struct Entity : IAddRemoveComponent<Entity>, IHasComponen
         }
         else
         {
-            sb.Append("|- DEAD");
+            sb.Append("-DEAD-");
         }
 
         return sb.ToString();

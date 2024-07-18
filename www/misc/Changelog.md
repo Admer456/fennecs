@@ -3,6 +3,37 @@ title: Release Notes
 order: 2
 outline: [2,2]
 
+head:
+  - - meta
+    - name: title
+      content: fennecs — Release Notes
+  - - meta
+    - property: og:description
+      content: Changelog for fennecs, the tiny, fast, modern C# Entity-Component System for games and simulations!
+  - - meta
+    - property: og:type
+      content: website
+  - - meta
+    - property: og:url
+      content: https://fennecs.tech/misc/Changelog.html
+  - - meta
+    - property: og:title
+      content: fennecs — tiny ECS Release Notes
+  - - meta
+    - name: twitter:title
+      content: fennecs — tiny ECS Release Notes
+  - - meta
+    - property: og:image
+      content: https://fennecs.tech/img/fennecs-changelog-panel.png
+  - - meta
+    - property: twitter:image
+      content: https://fennecs.tech/img/fennecs-changelog-panel.png
+  - - meta
+    - name: twitter:image
+      content: https://fennecs.tech/img/fennecs-changelog-panel.png
+  - - meta
+    - name: twitter:description
+      content: Changelog for fennecs, the tiny, fast, modern C# Entity-Component System for games and simulations!
 ---
 
 ![a stylized fox shattering red and green polygons surrounded by source code](https://fennecs.tech/img/fennec-changelog.png)
@@ -14,8 +45,42 @@ Here, there be ~~dragons~~ more foxes. *What did you expect?*
 > **fenn**ecs will remain in Beta until version 1.0.0, which is expected in Q4 2024. Breaking API changes as well as bugs are likely to occur without warning in these beta builds. 
 > You are nonetheless encouraged to try **fenn**ecs out, play around and experiment with the package freely; our resident foxes aim to keep it it as useful and stable as possible! Please report issues and feedback on the [GitHub Issues](https://github.com/outfox/fennecs/issues) board.
 
-## UPCOMING 0.5.6-beta
+## UPCOMING
+- `Match.Object` becomes internal / deprecated, use `Link.Any` instead.
+- `Stream` (a Stream View without any type parameters) will be added (so filtering without a component list feels less awkward)
 ...
+
+## Release 0.5.8-beta
+- `Component` factory class has most of its members deprecated. It is now a storage for a Boxed Component. ([updated documentation](/docs/Components/Expressions.md))
+- `Comp<T>` is a new factory class for Component Expressions. ([updated documentation](/docs/Components/Expressions.md))
+- get (read) a specific component using `entity.Get<T>(Match match)`, e.g. `entity.Get<MyLinkType>(Link.Any)` to get all the Links
+
+### Upgrading
+::: code-group
+```csharp  [old api] 🕸️
+var thanosStream = population.Stream<Alive>() with
+{
+    Subset = [Component.PlainComponent<Unlucky>()],    
+    Exclude = [Component.PlainComponent<Lucky>()],
+};
+```
+```csharp [new api] ✨
+var thanosStream = population.Stream<Alive>() with
+{
+    Subset = [Comp<Unlucky>.Plain],    
+    Exclude = [Comp<Lucky>.Plain],
+};
+```
+:::
+
+## Release 0.5.7-beta
+- `bugfix` - Stream Filters (Subset/Exclude) now affect the `Count` property of the Stream.
+- `bugfix` - `Stream<>.Despawn` respects current filters instead of despawning the entire underyling Query
+- reinstated the Thanos appetizer's functionality! OH SNAP!
+
+## Release 0.5.6-beta
+- `Link.Any` is a Match Target that can be used to match any Link target in a Query. It's value-identical to `Match.Object`, but makes the code more readable and reads in line with `Entity.Any`. 
+- lots of documentation updates and fixes
 
 ## Release 0.5.5-beta
 - `/www/misc/Changelog.md` added 🦊

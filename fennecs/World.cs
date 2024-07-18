@@ -13,6 +13,8 @@ public partial class World : Query
 
     private Meta[] _meta;
 
+    private readonly Guid _guid = Guid.NewGuid();
+    
     // "Identity" Archetype; all living Entities. (TODO: maybe change into publicly accessible "all" Query)
     private readonly Archetype _root;
 
@@ -76,6 +78,16 @@ public partial class World : Query
         }
     }
 
+    internal PooledList<Identity> SpawnBare(int count)
+    {
+        lock (_spawnLock)
+        {
+            var identities = _identityPool.Spawn(count);
+            Array.Resize(ref _meta, (int) BitOperations.RoundUpToPowerOf2((uint)_identityPool.Created + 1));
+            return identities;
+        }
+    }
+    
 
     private bool HasComponent(Identity identity, TypeExpression typeExpression)
     {
@@ -231,16 +243,27 @@ public partial class World : Query
         }
         */
     }
+    
+    internal IReadOnlyList<Component> GetComponents(Identity id)
+    {
+        var archetype = _meta[id.Index].Archetype;
+        return archetype.GetRow(_meta[id.Index].Row);
+    }
+
+    /// <inheritdoc />
+    public override int GetHashCode() => _guid.GetHashCode();
+
     #endregion
 
 
     #region Assert Helpers
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void AssertAlive(Identity identity)
+    private void AssertAlive(Identity identity)
     {
         if (IsAlive(identity)) return;
 
         throw new ObjectDisposedException($"Identity {identity} is no longer alive.");
     }
     #endregion
+
 }

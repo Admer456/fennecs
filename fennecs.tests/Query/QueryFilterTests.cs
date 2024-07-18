@@ -25,7 +25,7 @@ public class QueryFilterTests
         var entity3 = _world.Spawn().Add(new ComponentA()).Add(new ComponentB());
 
         // Act
-        var query2 = _query with { Subset = [Component.PlainComponent<ComponentA>()] }; 
+        var query2 = _query with { Subset = [Comp<ComponentA>.Plain] }; 
 
         var results = query2.ToList().Select(r => r.Item1).ToArray();
         
@@ -33,6 +33,9 @@ public class QueryFilterTests
         Assert.Contains(entity1, results);
         Assert.DoesNotContain(entity2, results);
         Assert.Contains(entity3, results);
+
+        //Ensure count is reduced
+        Assert.Equal(2, results.Length);
     }
 
     [Fact]
@@ -52,6 +55,9 @@ public class QueryFilterTests
         Assert.Contains(entity1, results);
         Assert.DoesNotContain(entity2, results);
         Assert.DoesNotContain(entity3, results);
+        
+        //Ensure count is reduced
+        Assert.Single(results);
     }
 }
 

@@ -1,8 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Numerics;
 using System.Text;
-using fennecs.pools;
 
 namespace fennecs;
 
@@ -83,13 +81,6 @@ public partial class World : IDisposable
     public Entity Spawn() => new(this, NewEntity()); //TODO: Check if semantically legal to spawn in Deferred mode.
 
 
-    internal PooledList<Identity> SpawnBare(int count)
-    {
-        var identities = _identityPool.Spawn(count);
-        Array.Resize(ref _meta, (int) BitOperations.RoundUpToPowerOf2((uint)_identityPool.Created + 1));
-        return identities;
-    }
-
     /// <summary>
     /// Spawns a number of pre-configured Entities. 
     /// </summary>
@@ -107,7 +98,7 @@ public partial class World : IDisposable
     /// <param name="values">component values</param>
     internal void Spawn(int count, IReadOnlyList<TypeExpression> components, IReadOnlyList<object> values)
     {
-        var signature = new Signature(components.ToImmutableSortedSet()).Add(Component.PlainComponent<Identity>().value);
+        var signature = new Signature(components.ToImmutableSortedSet()).Add(Comp<Identity>.Plain.Expression);
         var archetype = GetArchetype(signature);
         archetype.Spawn(count, components, values);
     }
@@ -216,7 +207,7 @@ public partial class World : IDisposable
         _meta = new Meta[initialCapacity];
 
         //Create the "Entity" Archetype, which is also the root of the Archetype Graph.
-        _root = GetArchetype(new(Component.PlainComponent<Identity>().value));
+        _root = GetArchetype(new(Comp<Identity>.Plain.Expression));
     }
 
 

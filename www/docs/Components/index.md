@@ -1,7 +1,7 @@
 ---
 title: Components
 order: 4
-outline: [1, 3]
+outline: [2, 2]
 ---
 
 # Components
@@ -76,12 +76,19 @@ bob.Add(Link.With(targo)); // bob also banks at targo (Type Bank->targo)
 
 ## Archetypes
 
-They are internal collections of Entities that share the same set of Components. **fenn**ecs is an Archetype-Based ECS, and shares many properties with other ECS of this family.
+Archetypes are internal collections of Entities that share the same set of Components.
 
-As an ECS user, you never interact with Archetypes directly, but understanding them is helpful to get the most out of **fenn**ecs.
+> ### **fenn**ecs is an Archetype-Based ECS
+It shares many properties (including strengths and weaknesses) with other ECS of this family. As an ECS user, you never interact with Archetypes directly, but understanding them is helpful to get the most out of **fenn**ecs.
 
-By grouping Entities into these collections, they can be processed most efficiently by the ECS. 
+By grouping Entities into Archetypes, the ECS (and by extension the CPU) can process them very efficiently. 
+
+**fenn**ecs constantly ensures that Entities with the same Components are stored tightly packed together in memory, which is a key factor in achieving high performance.  
+
+:neofox_packed_blue: :neofox_packed: :neofox_packed_green:
 
 This means that in large projects, there's a performance incentive to make frequently processed Archetypes either rare (e.g. aim for just a few dozen small ones), or chunky and large (e.g. 10k entities for a start, or even more).
 
-There's no practical limit to Archetypes and their sizes. Archetypes can get Compacted or Removed by the World's Garbage Collector. this is especially true for Archetypes of Relation Targets when the Target despawns - because that Archetype is extremely unlikely to ever get any Entities.
+There's no practical limit to Archetypes and their sizes. Archetypes can get Compacted or Removed by the World's Garbage Collector. 
+
+This is especially true for Archetypes of Relation Targets when the Target despawns - because that Archetype is extremely unlikely to ever get ~~lucky~~ any Entities again.

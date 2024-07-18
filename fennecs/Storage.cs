@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using fennecs.pools;
 
 namespace fennecs;
@@ -8,8 +9,16 @@ namespace fennecs;
 /// </summary>
 internal interface IStorage
 {
+    /// <summary>
+    /// The number of elements currently stored.
+    /// </summary>
     int Count { get; }
 
+    /// <summary>
+    /// The backing type of the elements stored.
+    /// </summary>
+    Type Type { get; }
+    
     /// <summary>
     /// Stores a boxed value at the given index.
     /// (use <c>Append</c> to add a new one)
@@ -73,6 +82,11 @@ internal interface IStorage
         var instance = (IStorage) Activator.CreateInstance(storageType)!;
         return instance;
     }
+
+    /// <summary>
+    /// Returns the element at position Row as a boxed object.
+    /// </summary>
+    IStrongBox Box(int row);
 }
 
 /// <summary>
@@ -93,8 +107,10 @@ internal class Storage<T> : IStorage
     {
         Span[index] = value;
     }
-
-
+    
+    /// <inheritdoc />
+    public Type Type => typeof(T);
+    
     /// <inheritdoc />
     public void Store(int index, object value) => Store(index, (T)value);
 
@@ -262,6 +278,16 @@ internal class Storage<T> : IStorage
     /// <inheritdoc/>
     public void Move(int index, IStorage destination) => Move(index, (Storage<T>)destination);
 
+    
+    /// <summary>
+    /// Gets the value at index as a <see cref="IStrongBox"/>.
+    /// </summary>
+    /// <remarks>
+    /// Value Types are copied, then boxed.
+    /// </remarks>
+    public IStrongBox Box(int row) => new StrongBox<T>(Span[row]);
+    
+    
     /// <summary>
     /// Boxed / General migration method.
     /// </summary>
@@ -287,10 +313,9 @@ internal class Storage<T> : IStorage
         Count += appendage.Length;
     }
 
-    public Memory<T> AsMemory(int start, int length)
-    {
-        return _data.AsMemory(start, length);
-    }
+    public Memory<T> AsMemory(int start, int length) => _data.AsMemory(start, length);
+
+    public Memory<T> AsMemory() => _data.AsMemory(0, Count);
 
     /// <summary>
     /// Returns a span representation of the actually contained data.
