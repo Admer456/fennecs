@@ -140,21 +140,6 @@ public readonly record struct Entity : IAddRemoveComponent<Entity>, IHasComponen
     /// <typeparam name="T">Any value or reference component type.</typeparam>
     /// <returns>Entity struct itself, allowing for method chaining.</returns>
     public Entity Add<T>(T data) where T : notnull => Add(data, default);
-    
-
-    /// <summary>
-    /// Adds a Component of a specific type, with specific data, to the current entity.
-    /// </summary>
-    /// <param name="componentType">The type of the Component to be added.</param>
-    /// <param name="data">The data associated with the Component.</param>
-    /// <returns>The current instance of EntityBuilder, allowing for method chaining.</returns>
-    public Entity Add(Type componentType, object data)
-    {
-        var type = TypeExpression.Of(componentType);
-        World.AddComponent(Id, type, data);
-        return this;
-    }
-
 
     /// <summary>
     /// Removes a Component of a specific type from the current entity.
